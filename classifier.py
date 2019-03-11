@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,6 +15,7 @@ import copy
 data_dir = "./dataset/hymenoptera_data/"
 model_name = 'resnet'
 num_classes = 2
+kj = [0, 10]
 batch_size = 8
 num_epochs = 15
 feature_extract = True
@@ -42,6 +45,31 @@ def train_model(model, features, dataloaders, criterion, optimizer, num_epochs=2
             running_loss = 0.0
             running_corrects = 0
 
+            train_features = defaultdict(list)
+            if phase == 'train':
+                for inputs, labels in dataloaders[phase]:
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+                    feas = features(inputs)
+                    for idx, t in enumerate(labels):
+                        t = t.item()
+                        train_features[t].append(feas[idx].squeeze())
+                for c in train_features:
+                    train_features[c] = torch.stack(train_features[c])
+                zj = []
+                distances = {}
+                for c in range(num_classes):
+                    if kj[c] > 0:
+                        x = train_features[c]
+                        xp = x[..., None]
+                        sub = (xp - x.transpose(1, 0))**2
+                        distances[c] = torch.sum(sub, dim=1)
+                    z = set()
+                    # for {(xi, yi): yi=cj}do
+                    #     Select N(xi) from V(cj)
+                    #     Sample a set ofrjnormalized positive vectorsW
+                    #     Zj=Zj∪{(xi, yi,N(xi),w)}w∈W
+                # Z = n∪j = 1Zc
             # Iterate over data.
             for inputs, labels in dataloaders[phase]:
                 inputs = inputs.to(device)
@@ -208,9 +236,12 @@ data_transforms = {
 print("Initializing Datasets and Dataloaders...")
 
 # Create training and validation datasets
-image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x]) for x in ['train', 'val']}
+image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x])
+                  for x in ['train', 'val']}
 # Create training and validation dataloaders
-dataloaders_dict = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size, shuffle=True, num_workers=4) for x in ['train', 'val']}
+dataloaders_dict = {x: torch.utils.data.DataLoader(image_datasets[x],
+                                                   batch_size=batch_size, shuffle=True, num_workers=4)
+                    for x in ['train', 'val']}
 
 
 model_ft = model_ft.to(device)
