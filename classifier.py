@@ -17,6 +17,8 @@ data_dir = "./dataset/hymenoptera_data/"
 model_name = 'resnet'
 num_classes = 2
 kj = [0, 10]
+Nj = [0, 4]
+rj = [0, 5]
 batch_size = 8
 num_epochs = 15
 feature_extract = True
@@ -46,38 +48,42 @@ def train_model(model, features, dataloaders, criterion, optimizer, num_epochs=2
             running_loss = 0.0
             running_corrects = 0
 
-            # train_features = defaultdict(list)
-            # if phase == 'train':
-            #     for inputs, labels in dataloaders[phase]:
-            #         inputs = inputs.to(device)
-            #         labels = labels.to(device)
-            #         feas = features(inputs)
-            #         for idx, t in enumerate(labels):
-            #             t = t.item()
-            #             train_features[t].append(feas[idx].squeeze())
-            #     for c in train_features:
-            #         train_features[c] = torch.stack(train_features[c])
-            #     zj = []
-            #     distances = {}
-            #     for c in range(num_classes):
-            #         if kj[c] > 0:
-            #             x = train_features[c]
-            #             xp = x[..., None]
-            #             sub = (xp - x.transpose(1, 0))**2
-            #             distances[c] = torch.sum(sub, dim=1)
-            #         z = set()
-            #
-            #         for inputs, labels in dataloaders[phase]:
-            #             inputs = inputs.to(device)
-            #             labels = labels.to(device)
-            #             feas = features(inputs)
-            #             for idx, t in enumerate(labels):
-            #                 t = t.item()
-            #         # for {(xi, yi): yi=cj}do
-            #         #     Select N(xi) from V(cj)
-            #         #     Sample a set of rj normalized positive vectors W
-            #         #     Zj=Zj∪{(xi, yi,N(xi),w)}w∈W
-            #     # Z = n∪j = 1Zc
+            train_features = defaultdict(list)
+            fnames = defaultdict(list)
+            if phase == 'train':
+                for inputs, labels, fname in dataloaders[phase]:
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+                    feas = features(inputs)
+                    for idx, t in enumerate(labels):
+                        t = t.item()
+                        train_features[t].append(feas[idx].squeeze())
+                        fnames[t].append(fname)
+                for c in train_features:
+                    train_features[c] = torch.stack(train_features[c])
+                zj = []
+                distances = {}
+                for c in range(num_classes):
+                    if kj[c] > 0:
+                        x = train_features[c]
+                        xp = x[..., None]
+                        sub = (xp - x.transpose(1, 0))**2
+                        distances[c] = torch.sum(sub, dim=1)
+
+                    z = set()
+                    for i, fname in enumerate(fnames[c]):
+                        _, sorted_args = torch.sort(distances[c, i])
+                        same_class_features = train_features[c]
+                        nearest_idxs = sorted_args[:Nj[c]]
+                        nearest_features = same_class_features[nearest_idxs]
+                        for t in range(rj[c]):
+                            w = 
+                            z.add((fname, c, nearest_features, w))
+                    # for {(xi, yi): yi=cj}do
+                    #     Select N(xi) from V(cj)
+                    #     Sample a set of rj normalized positive vectors W
+                    #     Zj=Zj∪{(xi, yi,N(xi),w)}w∈W
+                # Z = n∪j = 1Zc
             # Iterate over data.
             for inputs, labels, fname in dataloaders[phase]:
                 inputs = inputs.to(device)
