@@ -11,6 +11,7 @@ import time
 import os
 import copy
 
+from dataset import Dataset
 
 data_dir = "./dataset/hymenoptera_data/"
 model_name = 'resnet'
@@ -40,38 +41,45 @@ def train_model(model, features, dataloaders, criterion, optimizer, num_epochs=2
             if phase == 'train':
                 model.train()  # Set model to training mode
             else:
-                model.eval()   # Set model to evaluate mode
+                model.eval()  # Set model to evaluate mode
 
             running_loss = 0.0
             running_corrects = 0
 
-            train_features = defaultdict(list)
-            if phase == 'train':
-                for inputs, labels in dataloaders[phase]:
-                    inputs = inputs.to(device)
-                    labels = labels.to(device)
-                    feas = features(inputs)
-                    for idx, t in enumerate(labels):
-                        t = t.item()
-                        train_features[t].append(feas[idx].squeeze())
-                for c in train_features:
-                    train_features[c] = torch.stack(train_features[c])
-                zj = []
-                distances = {}
-                for c in range(num_classes):
-                    if kj[c] > 0:
-                        x = train_features[c]
-                        xp = x[..., None]
-                        sub = (xp - x.transpose(1, 0))**2
-                        distances[c] = torch.sum(sub, dim=1)
-                    z = set()
-                    # for {(xi, yi): yi=cj}do
-                    #     Select N(xi) from V(cj)
-                    #     Sample a set ofrjnormalized positive vectorsW
-                    #     Zj=Zj∪{(xi, yi,N(xi),w)}w∈W
-                # Z = n∪j = 1Zc
+            # train_features = defaultdict(list)
+            # if phase == 'train':
+            #     for inputs, labels in dataloaders[phase]:
+            #         inputs = inputs.to(device)
+            #         labels = labels.to(device)
+            #         feas = features(inputs)
+            #         for idx, t in enumerate(labels):
+            #             t = t.item()
+            #             train_features[t].append(feas[idx].squeeze())
+            #     for c in train_features:
+            #         train_features[c] = torch.stack(train_features[c])
+            #     zj = []
+            #     distances = {}
+            #     for c in range(num_classes):
+            #         if kj[c] > 0:
+            #             x = train_features[c]
+            #             xp = x[..., None]
+            #             sub = (xp - x.transpose(1, 0))**2
+            #             distances[c] = torch.sum(sub, dim=1)
+            #         z = set()
+            #
+            #         for inputs, labels in dataloaders[phase]:
+            #             inputs = inputs.to(device)
+            #             labels = labels.to(device)
+            #             feas = features(inputs)
+            #             for idx, t in enumerate(labels):
+            #                 t = t.item()
+            #         # for {(xi, yi): yi=cj}do
+            #         #     Select N(xi) from V(cj)
+            #         #     Sample a set of rj normalized positive vectors W
+            #         #     Zj=Zj∪{(xi, yi,N(xi),w)}w∈W
+            #     # Z = n∪j = 1Zc
             # Iterate over data.
-            for inputs, labels in dataloaders[phase]:
+            for inputs, labels, fname in dataloaders[phase]:
                 inputs = inputs.to(device)
                 labels = labels.to(device)
 
@@ -90,7 +98,7 @@ def train_model(model, features, dataloaders, criterion, optimizer, num_epochs=2
                         outputs, aux_outputs = model(inputs)
                         loss1 = criterion(outputs, labels)
                         loss2 = criterion(aux_outputs, labels)
-                        loss = loss1 + 0.4*loss2
+                        loss = loss1 + 0.4 * loss2
                     else:
                         outputs = model(inputs)
                         loss = criterion(outputs, labels)
@@ -204,7 +212,7 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
         model_ft.AuxLogits.fc = nn.Linear(num_ftrs, num_classes)
         # Handle the primary net
         num_ftrs = model_ft.fc.in_features
-        model_ft.fc = nn.Linear(num_ftrs,num_classes)
+        model_ft.fc = nn.Linear(num_ftrs, num_classes)
         input_size = 299
 
     else:
@@ -216,7 +224,6 @@ def initialize_model(model_name, num_classes, feature_extract, use_pretrained=Tr
 
 # Initialize the model for this run
 model_ft, input_size, features = initialize_model(model_name, num_classes, feature_extract, use_pretrained=True)
-
 
 data_transforms = {
     'train': transforms.Compose([
@@ -236,13 +243,12 @@ data_transforms = {
 print("Initializing Datasets and Dataloaders...")
 
 # Create training and validation datasets
-image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x])
+image_datasets = {x: Dataset(os.path.join(data_dir, x), data_transforms[x])
                   for x in ['train', 'val']}
 # Create training and validation dataloaders
 dataloaders_dict = {x: torch.utils.data.DataLoader(image_datasets[x],
                                                    batch_size=batch_size, shuffle=True, num_workers=4)
                     for x in ['train', 'val']}
-
 
 model_ft = model_ft.to(device)
 
@@ -266,7 +272,6 @@ else:
 
 # Observe that all parameters are being optimized
 optimizer_ft = optim.SGD(params_to_update, lr=0.001, momentum=0.9)
-
 
 # Setup the loss fxn
 criterion = nn.CrossEntropyLoss()
