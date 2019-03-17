@@ -11,7 +11,7 @@ import time
 import os
 import copy
 
-from dataset import Dataset
+from dataset import Dataset, ImbalancedDataset
 
 data_dir = "./dataset/hymenoptera_data/"
 model_name = 'resnet'
@@ -58,10 +58,10 @@ def train_model(model, features, dataloaders, criterion, optimizer, num_epochs=2
                     for idx, t in enumerate(labels):
                         t = t.item()
                         train_features[t].append(feas[idx].squeeze())
-                        fnames[t].append(fname)
+                        fnames[t].append(fname[idx])
                 for c in train_features:
                     train_features[c] = torch.stack(train_features[c])
-                zj = []
+                # zj = []
                 distances = {}
                 for c in range(num_classes):
                     if kj[c] > 0:
@@ -69,22 +69,26 @@ def train_model(model, features, dataloaders, criterion, optimizer, num_epochs=2
                         xp = x[..., None]
                         sub = (xp - x.transpose(1, 0))**2
                         distances[c] = torch.sum(sub, dim=1)
-
-                    z = set()
-                    for i, fname in enumerate(fnames[c]):
-                        _, sorted_args = torch.sort(distances[c, i])
-                        same_class_features = train_features[c]
-                        nearest_idxs = sorted_args[:Nj[c]]
-                        nearest_features = same_class_features[nearest_idxs]
-                        for t in range(rj[c]):
-                            w = 
-                            z.add((fname, c, nearest_features, w))
+                imbalanced_dataset = ImbalancedDataset(fnames, data_transforms['train'], None, None,
+                                                       distances_matrix=distances, class_wise_overloading=kj,
+                                                       class_wise_oversampling=rj, class_neighbors=Nj)
+                    # z = set()
+                    # for i, fname in enumerate(fnames[c]):
+                    #     _, sorted_args = torch.sort(distances[c, i])
+                    #     same_class_features = train_features[c]
+                    #     nearest_idxs = sorted_args[:Nj[c]]
+                    #     nearest_features = same_class_features[nearest_idxs]
+                    #     for t in range(rj[c]):
+                    #         w = gfdgfd
+                    #         z.add((fname, c, nearest_features, w))
                     # for {(xi, yi): yi=cj}do
                     #     Select N(xi) from V(cj)
                     #     Sample a set of rj normalized positive vectors W
                     #     Zj=Zj∪{(xi, yi,N(xi),w)}w∈W
                 # Z = n∪j = 1Zc
             # Iterate over data.
+                dataloaders['train'] = torch.utils.data.DataLoader(imbalanced_dataset,
+                                                                   batch_size=batch_size, shuffle=True, num_workers=4)
             for inputs, labels, fname in dataloaders[phase]:
                 inputs = inputs.to(device)
                 labels = labels.to(device)
@@ -100,7 +104,7 @@ def train_model(model, features, dataloaders, criterion, optimizer, num_epochs=2
                     #   mode we calculate the loss by summing the final output and the auxiliary output
                     #   but in testing we only consider the final output.
                     if is_inception and phase == 'train':
-                        # From https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
+                        #https://discuss.pytorch.org/t/how-to-optimize-inception-model-with-auxiliary-classifiers/7958
                         outputs, aux_outputs = model(inputs)
                         loss1 = criterion(outputs, labels)
                         loss2 = criterion(aux_outputs, labels)
