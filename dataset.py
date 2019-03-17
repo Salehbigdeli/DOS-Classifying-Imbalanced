@@ -45,16 +45,12 @@ class ImbalancedDataset(data.Dataset):
         self.fnames = []
         self.classes = []
         for cls, names in fnames.items():
-            print(type(fnames), fnames)
             self.fnames.extend(names)
             self.classes.extend([cls]*len(names))
-        print(self.fnames)
-        print(self.classes)
         self.distances_matrix = distances_matrix
         self.class_wise_overloading = class_wise_overloading
         self.class_wise_oversampling = class_wise_oversampling
         self.class_neighbors = class_neighbors
-        print('ok')
 
     def __len__(self):
         return len(self.fnames)
